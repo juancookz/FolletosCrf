@@ -2,10 +2,10 @@
 using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 
-string jsonFilePath = "v1.json";
-string downloadDirectory = "downloaded_images";
-string outputPdfPath = "Catalog.pdf";
-
+string jsonFilePath = "files/v1.json";
+string downloadDirectory = "files/downloaded_images";
+string outputPdfPath = "files/Catalog.pdf";
+Directory.CreateDirectory("files");
 List<ImageInfo> images = [];
 try
 {
