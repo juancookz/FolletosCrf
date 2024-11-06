@@ -1,13 +1,92 @@
 ﻿using System.Text.Json;
+using PdfSharp.Pdf;
+using PdfSharp.Drawing;
 
 string jsonFilePath = "v1.json";
 string downloadDirectory = "downloaded_images";
+string outputPdfPath = "Catalog.pdf";
 
-await JsonDownload(jsonFilePath);
+List<ImageInfo> images = [];
+try
+{
+    await JsonDownload(jsonFilePath);
+}
+catch (System.Exception)
+{
+    System.Console.WriteLine("Fallo al descargar el JSON");
+    WaitForExit();
+    return;
+}
+try
+{
+    images = ImageUrlObtainer(jsonFilePath, downloadDirectory);
+}
+catch (System.Exception)
+{
+    System.Console.WriteLine("Fallo al obtener las URLs de las imagenes");
+    WaitForExit();
+    return;
+}
+try
+{
+    await Downloader(downloadDirectory, images);
+}
+catch (System.Exception)
+{
+    System.Console.WriteLine("Fallo al descargar las imagenes");
+    WaitForExit();
+    return;
+}
 
-List<ImageInfo> images = ImageUrlObtainer(jsonFilePath, downloadDirectory);
+CreatePdfFromImages(downloadDirectory, outputPdfPath, 595, 779);// A4 size in points
+Console.WriteLine($"PDF created at {outputPdfPath}");
 
-await Downloader(downloadDirectory, images);
+
+static void CreatePdfFromImages(string imageDirectory, string outputPdfPath, double fixedWidth, double fixedHeight)
+{
+    PdfDocument pdf = new PdfDocument();
+    var imageFiles = Directory.GetFiles(imageDirectory, "*.jpg").OrderBy(f => f);
+
+    foreach (var imagePath in imageFiles)
+    {
+        PdfPage page = pdf.AddPage();
+        page.Width = XUnit.FromPoint(fixedWidth);
+        page.Height = XUnit.FromPoint(fixedHeight);
+
+        using (XGraphics gfx = XGraphics.FromPdfPage(page))
+        {
+            XImage image = XImage.FromFile(imagePath);
+            double aspectRatio = image.PixelWidth / (double)image.PixelHeight;
+            double pageAspectRatio = fixedWidth / fixedHeight;
+
+            // Calculate the new dimensions while maintaining aspect ratio
+            double drawWidth, drawHeight;
+
+            if (aspectRatio > pageAspectRatio)
+            {
+                // Image is wider than the page
+                drawWidth = fixedWidth;
+                drawHeight = fixedWidth / aspectRatio;
+            }
+            else
+            {
+                // Image is taller than or equal to the page
+                drawHeight = fixedHeight;
+                drawWidth = fixedHeight * aspectRatio;
+            }
+
+            // Center the image on the page
+            double xOffset = (fixedWidth - drawWidth) / 2;
+            double yOffset = (fixedHeight - drawHeight) / 2;
+
+            // Draw the image
+            gfx.DrawImage(image, xOffset, yOffset, drawWidth, drawHeight);
+        }
+    }
+
+    // Save the PDF
+    pdf.Save(outputPdfPath);
+}
 
 static List<ImageInfo> ImageUrlObtainer(string jsonFilePath, string downloadDirectory)
 {
@@ -73,4 +152,10 @@ static async Task JsonDownload(string jsonFilePath)
         await File.WriteAllBytesAsync(jsonFilePath, Bytes);
         Console.WriteLine($"Downloaded {jsonFilePath}");
     }
+}
+
+static void WaitForExit()
+{
+    System.Console.WriteLine("Presione cualquier tecla para salir.");
+    Console.ReadKey();
 }
